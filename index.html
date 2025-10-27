@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compteur de Points</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css"> 
+</head>
+<body>
+
+    <div id="configuration-ecran">
+        <h2>🎲 Nouvelle Partie</h2>
+        <div class="input-group">
+            <input type="text" id="nom-joueur" placeholder="Nom du joueur">
+            <button id="ajouter-joueur">Ajouter</button>
+        </div>
+        
+        <div id="liste-joueurs-conf">
+            </div>
+
+        <div class="option-secret">
+            <input type="checkbox" id="mode-secret-config">
+            <label for="mode-secret-config">Garder les scores secrets jusqu'à la fin</label>
+        </div>
+
+        <div class="option-victoire input-group">
+            <strong>Objectif du jeu :</strong>
+            <label><input type="radio" name="condition-victoire" value="low" checked> Avoir le MOINS de points (ex: Skyjo)</label>
+            <label><input type="radio" name="condition-victoire" value="high"> Avoir le PLUS de points</label>
+        </div>
+        <button id="demarrer-partie" disabled>Démarrer la partie</button>
+    </div>
+
+    <div id="score-ecran" class="cache">
+        <h2>🏆 Scores en cours</h2>
+
+        <div id="compteurs-manches">
+            <p>Manches jouées : <strong id="manches-passees">0</strong></p>
+            <p id="manches-restantes-affichage" class="cache">Manches restantes : <strong id="manches-restantes">--</strong></p>
+            <p id="points-restants-affichage" class="cache">Points avant limite : <strong id="points-restants">--</strong></p>
+        </div>
+        <div class="score-main-container">
+
+            <div class="score-gauche">
+                
+                <div id="score-affichage">
+                    </div>
+
+                <div class="graphique-container input-group">
+                    <h3>📈 Évolution des Scores</h3>
+                    <canvas id="graphique-scores"></canvas>
+                </div>
+
+                <div class="input-tour">
+                    <h3>Nouveau Tour</h3>
+                    <div id="saisie-points">
+                        </div>
+                    <button id="valider-tour">Valider le Tour</button>
+                </div>
+            </div>
+
+            <div class="score-droite">
+                <h3>Conditions d'Arrêt :</h3>
+                
+                <div class="fin-partie-options input-group">
+                    <label>
+                        <input type="checkbox" class="condition-checkbox" id="check-score-limite" data-type="score_limite"> 
+                        Arrêter quand un joueur atteint <input type="number" id="score-limite" min="1" value="100" disabled> points (Total).
+                    </label><br>
+                    
+                    <label>
+                        <input type="checkbox" class="condition-checkbox" id="check-score-relatif" data-type="score_relatif"> 
+                        Arrêter quand un joueur a marqué <input type="number" id="score-relatif" min="1" value="50" disabled> points de plus que maintenant.
+                    </label><br>
+                    
+                    <label>
+                        <input type="checkbox" class="condition-checkbox" id="check-manche-total" data-type="manche_total"> 
+                        Arrêter après un total de <input type="number" id="nb-manches-total" min="1" value="10" disabled> manches.
+                    </label><br>
+                    
+                    <label>
+                        <input type="checkbox" class="condition-checkbox" id="check-manche-restante" data-type="manche_restante"> 
+                        Arrêter dans <input type="number" id="nb-manches-restantes" min="1" value="3" disabled> manches restantes.
+                    </label>
+                </div>
+                
+                <button id="arreter-maintenant" class="bouton-fin">Terminer la partie Maintenant</button>
+            </div>
+            
+        </div>
+    </div>
+
+    <div id="podium-ecran" class="cache">
+        <h2>🎉 Partie Terminée !</h2>
+        <div id="podium-affichage">
+            </div>
+        
+        <div id="graphique-final-container" class="input-group">
+            </div>
+    </div>
+
+    <script src="script.js"></script> 
+</body>
+</html>
