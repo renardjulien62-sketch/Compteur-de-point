@@ -3,123 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compteur de Score</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Compteur de Points</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div id="configuration-ecran" class="ecran">
-        <h1>Configuration de la Partie</h1>
-
-        <div class="input-groupe">
+    <div id="configuration-ecran">
+        <h2>🎲 Nouvelle Partie</h2>
+        <div class="input-group">
+            <input type="text" id="nom-joueur" placeholder="Nom du joueur">
+            <label for="couleur-joueur" class="label-couleur">Couleur :</label>
             <input type="color" id="couleur-joueur" value="#FF6384">
-            <input type="text" id="nom-joueur" placeholder="Nom du joueur...">
             <button id="ajouter-joueur">Ajouter</button>
         </div>
-
-        <div id="liste-joueurs-conf">
-            <p>Ajoutez au moins deux joueurs pour commencer.</p>
+        <div id="liste-joueurs-conf"></div>
+        <div class="option-secret">
+            <input type="checkbox" id="mode-secret-config">
+            <label for="mode-secret-config">Garder les scores secrets jusqu'à la fin</label>
         </div>
-        
-        <hr>
-
-        <div class="config-options">
-            <label><input type="checkbox" id="mode-secret-config"> Mode Scores Secrets</label>
-            <div>
-                Victoire :
-                <label><input type="radio" name="condition-victoire" value="low" checked> Score le + bas</label>
-                <label><input type="radio" name="condition-victoire" value="high"> Score le + haut</label>
-            </div>
-            
-            <h3>Conditions d'arrêt</h3>
-            <label><input type="checkbox" class="condition-checkbox" data-type="score_limite">
-                Score atteint : <input type="number" id="score-limite" value="100" disabled>
-            </label>
-            <label><input type="checkbox" class="condition-checkbox" data-type="score_relatif">
-                Score relatif atteint : <input type="number" id="score-relatif" value="50" disabled>
-            </label>
-            <label><input type="checkbox" class="condition-checkbox" data-type="manche_total">
-                Nombre de manches : <input type="number" id="nb-manches-total" value="10" disabled>
-            </label>
-            <label><input type="checkbox" class="condition-checkbox" data-type="manche_restante">
-                Manches restantes : <input type="number" id="nb-manches-restantes" value="5" disabled>
-            </label>
+        <div class="option-victoire input-group">
+            <strong>Objectif du jeu :</strong>
+            <label><input type="radio" name="condition-victoire" value="low" checked> Avoir le MOINS de points (ex: Skyjo)</label>
+            <label><input type="radio" name="condition-victoire" value="high"> Avoir le PLUS de points</label>
         </div>
-
         <button id="demarrer-partie" disabled>Démarrer la partie</button>
     </div>
 
-    <div id="score-ecran" class="ecran cache">
-        <div class="score-grid">
+    <div id="score-ecran" class="cache">
+        <h2>🏆 Scores en cours</h2>
+        <div id="compteurs-manches">
+            <p>Manches jouées : <strong id="manches-passees">0</strong></p>
+            <p id="manches-restantes-affichage" class="cache">Manches restantes : <strong id="manches-restantes">--</strong></p>
+            <p id="points-restants-affichage" class="cache">Points avant limite : <strong id="points-restants">--</strong></p>
+        </div>
+        <div class="score-main-container">
             <div class="score-gauche">
-                <h2>Suivi des Scores</h2>
-                <div id="score-affichage">
-                    </div>
-
-                <div class="graphique-container">
+                <div id="score-affichage"></div>
+                <div class="graphique-container input-group">
+                    <h3>📈 Évolution des Scores</h3>
                     <canvas id="graphique-scores"></canvas>
                 </div>
-                
                 <div class="input-tour">
-                    <h3>Saisie du Tour</h3>
-                    <div id="saisie-points">
-                        </div>
+                    <h3>Nouveau Tour</h3>
+                    <div id="saisie-points"></div>
                     <button id="valider-tour">Valider le Tour</button>
                 </div>
             </div>
-
             <div class="score-droite">
-                <h3>Infos Partie</h3>
-                <p>Manches passées : <span id="manches-passees">0</span></p>
-                <div id="manches-restantes-affichage" class="cache">
-                    Manches restantes : <span id="manches-restantes">0</span>
+                <h3>Conditions d'Arrêt :</h3>
+                <div class="fin-partie-options input-group">
+                    <label>
+                        <input type="checkbox" class="condition-checkbox" id="check-score-limite" data-type="score_limite">
+                        Arrêter quand un joueur atteint <input type="number" id="score-limite" min="1" value="100" disabled> points (Total).
+                    </label><br>
+                    <label>
+                        <input type="checkbox" class="condition-checkbox" id="check-score-relatif" data-type="score_relatif">
+                        Arrêter quand un joueur a marqué <input type="number" id="score-relatif" min="1" value="50" disabled> points de plus que maintenant.
+                    </label><br>
+                    <label>
+                        <input type="checkbox" class="condition-checkbox" id="check-manche-total" data-type="manche_total">
+                        Arrêter après un total de <input type="number" id="nb-manches-total" min="1" value="10" disabled> manches.
+                    </label><br>
+                    <label>
+                        <input type="checkbox" class="condition-checkbox" id="check-manche-restante" data-type="manche_restante">
+                        Arrêter dans <input type="number" id="nb-manches-restantes" min="1" value="3" disabled> manches restantes.
+                    </label>
                 </div>
-                <div id="points-restants-affichage" class="cache">
-                    Points avant fin : <span id="points-restants">0</span>
-                </div>
-                <button id="arreter-maintenant">Arrêter la partie maintenant</button>
+                <button id="arreter-maintenant" class="bouton-fin">Terminer la partie Maintenant</button>
             </div>
         </div>
     </div>
 
-    <div id="reveal-ecran" class="ecran cache">
-        <button id="skip-all-btn">Tout passer &gt;&gt;</button>
+    <div id="reveal-ecran" class="cache">
         <div id="reveal-content">
-            <div id="reveal-rang">5ème Place</div>
-            <div id="reveal-nom">Nom du Joueur</div>
-            <div id="reveal-score">100 points</div>
+            <h3 id="reveal-rang">5ème Place</h3>
+            <div class="reveal-nom-container">
+                <h2 id="reveal-nom-placeholder">???</h2>
+                <h2 id="reveal-nom">Nom du Joueur</h2>
+            </div>
+            <p id="reveal-score">0 points</p>
         </div>
-    </div>
 
-    <div id="podium-ecran" class="ecran cache">
-        <h2>Classement Final</h2>
-        <div class="podium-container">
-            <div id="podium-2" class="podium-bloc">
-                <div class="podium-rang">2</div>
-                <div class="podium-nom">Joueur 2</div>
-                <div class="podium-score">80 pts</div>
+        <button id="skip-all-btn" class="bouton-fin">Passer l'animation</button>
+        </div>
+    <div id="podium-ecran" class="cache">
+        <h2>🎉 Podium Final !</h2>
+        <div id="podium-visuel">
+            <div class="podium-place" id="podium-2">
+                <span class="podium-medaille">🥈</span>
+                <div class="podium-nom">...</div>
+                <div class="podium-score">...</div>
             </div>
-            <div id="podium-1" class="podium-bloc">
-                <div class="podium-rang">1</div>
-                <div class="podium-nom">Joueur 1</div>
-                <div class="podium-score">100 pts</div>
+            <div class="podium-place" id="podium-1">
+                <span class="podium-medaille">🥇</span>
+                <div class="podium-nom">...</div>
+                <div class="podium-score">...</div>
             </div>
-            <div id="podium-3" class="podium-bloc">
-                <div class="podium-rang">3</div>
-                <div class="podium-nom">Joueur 3</div>
-                <div class="podium-score">70 pts</div>
+            <div class="podium-place" id="podium-3">
+                <span class="podium-medaille">🥉</span>
+                <div class="podium-nom">...</div>
+                <div class="podium-score">...</div>
             </div>
         </div>
-        
-        <div id="autres-joueurs" class="cache">
+        <div id="autres-joueurs" class="input-group">
             <h3>Autres Joueurs</h3>
-            <ul id="autres-joueurs-liste">
-                </ul>
+            <ul id="autres-joueurs-liste"></ul>
         </div>
-
-        <div id="graphique-final-container">
-            </div>
+        <div id="graphique-final-container" class="input-group"></div>
     </div>
 
     <script src="script.js"></script>
