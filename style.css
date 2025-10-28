@@ -1,4 +1,4 @@
-aa/* --- Styles de base --- */
+/* --- Styles de base --- */
 body {
     font-family: Arial, sans-serif;
     padding: 20px;
@@ -224,7 +224,7 @@ button:disabled {
     justify-content: center;
     align-items: center;
     overflow: hidden;
-    cursor: pointer; /* NOUVEAU: Montre qu'on peut cliquer */
+    cursor: pointer; 
 }
 
 #reveal-content {
@@ -237,7 +237,7 @@ button:disabled {
     max-width: 80%;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     transform: translateZ(0);
-    cursor: default; /* NOUVEAU: Le nuage lui-même n'est pas cliquable */
+    cursor: default; 
 }
 
 #reveal-rang {
@@ -280,7 +280,6 @@ button:disabled {
     margin: 0;
 }
 
-/* NOUVEAU: Style du bouton Skip Total */
 #skip-all-btn {
     position: fixed;
     bottom: 30px;
@@ -319,7 +318,7 @@ button:disabled {
 /* --- ▲▲▲ FIN DES ANIMATIONS ▲▲▲ --- */
 
 
-/* --- STYLES DU PODIUM VISUEL (Inchangé) --- */
+/* --- STYLES DU PODIUM VISUEL --- */
 #podium-ecran {
     text-align: center;
 }
