@@ -10,47 +10,26 @@
 <body>
 
     <div id="configuration-ecran">
-        <h2>🎲 Compteur de Points</h2>
-
-        <div class="lobby-section input-group">
-            <h3>Créer une Nouvelle Partie</h3>
-            <input type="text" id="nom-createur" placeholder="Votre nom (Créateur)">
-            <label for="couleur-createur" class="label-couleur">Votre couleur :</label>
-            <input type="color" id="couleur-createur" value="#FF6384">
-            <button id="creer-partie-btn">Créer</button>
-            <p id="code-partie-affichage" class="cache">Code de la partie : <strong id="code-partie"></strong> <button id="copier-code-btn">Copier</button></p>
-            <p id="attente-joueurs-msg" class="cache">En attente d'autres joueurs... Partagez le code.</p>
+        <h2>🎲 Nouvelle Partie</h2>
+        <div class="input-group">
+            <input type="text" id="nom-joueur" placeholder="Nom du joueur">
+            <label for="couleur-joueur" class="label-couleur">Couleur :</label>
+            <input type="color" id="couleur-joueur" value="#FF6384">
+            <button id="ajouter-joueur">Ajouter</button>
         </div>
-
-        <div class="lobby-section input-group">
-            <h3>Rejoindre une Partie</h3>
-            <input type="text" id="code-partie-input" placeholder="Code de la partie (ex: ABCD)">
-            <input type="text" id="nom-rejoindre" placeholder="Votre nom">
-             <label for="couleur-rejoindre" class="label-couleur">Votre couleur :</label>
-            <input type="color" id="couleur-rejoindre" value="#36A2EB">
-            <button id="rejoindre-partie-btn">Rejoindre</button>
-            <p id="rejoindre-erreur" class="erreur-msg cache"></p>
+        <div id="liste-joueurs-conf"></div>
+        <div class="option-secret">
+            <input type="checkbox" id="mode-secret-config">
+            <label for="mode-secret-config">Garder les scores secrets jusqu'à la fin</label>
         </div>
-
-        <div id="lobby-joueurs" class="input-group cache">
-             <h3>Joueurs dans la partie :</h3>
-             <div id="liste-joueurs-lobby"></div>
-             <div id="options-createur" class="cache">
-                <div class="option-secret">
-                    <input type="checkbox" id="mode-secret-config">
-                    <label for="mode-secret-config">Garder les scores secrets jusqu'à la fin</label>
-                </div>
-                <div class="option-victoire input-group">
-                    <strong>Objectif du jeu :</strong>
-                    <label><input type="radio" name="condition-victoire" value="low" checked> Avoir le MOINS de points</label>
-                    <label><input type="radio" name="condition-victoire" value="high"> Avoir le PLUS de points</label>
-                </div>
-                <button id="lancer-partie-btn" disabled>Lancer la partie</button>
-             </div>
-             <p id="attente-lancement-msg" class="cache">En attente que le créateur lance la partie...</p>
-         </div>
-
+        <div class="option-victoire input-group">
+            <strong>Objectif du jeu :</strong>
+            <label><input type="radio" name="condition-victoire" value="low" checked> Avoir le MOINS de points (ex: Skyjo)</label>
+            <label><input type="radio" name="condition-victoire" value="high"> Avoir le PLUS de points</label>
+        </div>
+        <button id="demarrer-partie" disabled>Démarrer la partie</button>
     </div>
+
     <div id="score-ecran" class="cache">
         <h2>🏆 Scores en cours</h2>
         <div id="compteurs-manches">
@@ -105,9 +84,9 @@
             </div>
             <p id="reveal-score">0 points</p>
         </div>
-        <button id="skip-all-btn" class="bouton-fin">Passer l'animation</button>
-    </div>
 
+        <button id="skip-all-btn" class="bouton-fin">Passer l'animation</button>
+        </div>
     <div id="podium-ecran" class="cache">
         <h2>🎉 Podium Final !</h2>
         <div id="podium-visuel">
@@ -134,25 +113,6 @@
         <div id="graphique-final-container" class="input-group"></div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore-compat.js"></script>
-
-    <script>
-      // 2. Ta configuration Firebase
-      const firebaseConfig = {
-        apiKey: "AIzaSyD1cC-bahvm3fqZcsYYiBvolyaqVyMGXnI",
-        authDomain: "compteur-point-julien.firebaseapp.com",
-        projectId: "compteur-point-julien",
-        storageBucket: "compteur-point-julien.appspot.com", // Correction: .appspot.com
-        messagingSenderId: "961827366523",
-        appId: "1:961827366523:web:51db1d7ac1f975f569e4de"
-      };
-
-      // 3. Initialise Firebase
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.firestore(); // Crée une référence globale à Firestore Database
-    </script>
     <script src="script.js"></script>
-
 </body>
 </html>
