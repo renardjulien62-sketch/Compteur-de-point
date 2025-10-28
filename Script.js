@@ -1,15 +1,10 @@
 // --- VARIABLES GLOBALES ---
-let joueurs = []; // { id, nom, couleur, scoreTotal, scoresTour, scoreRelatifPivot, rang }
-let partieId = null; // ID de la partie dans Firebase
-let joueurId = null; // ID unique du joueur actuel
-let createurId = null; // ID du créateur de la partie
-let unsubscribePartie = null; // Pour arrêter d'écouter les mises à jour Firebase
-
+let joueurs = []; // { nom, couleur, scoreTotal, scoresTour, scoreRelatifPivot, rang } <-- Ajout de rang
 let scoresSecrets = false;
 let mancheActuelle = 0;
 let lowScoreWins = true;
 let monGraphique = null;
-let classementFinal = [];
+let classementFinal = []; // Contiendra les joueurs avec leur rang calculé
 
 let sequenceForceStop = false;
 let currentStepSkipper = null;
@@ -21,6 +16,7 @@ let conditionsArret = {
     manche_restante: { active: false, mancheCible: 0 }
 };
 
+// Mappage
 const inputIdMap = {
     'score_limite': 'score-limite',
     'score_relatif': 'score-relatif',
@@ -29,40 +25,22 @@ const inputIdMap = {
 };
 
 // --- SÉLECTION DES ÉLÉMENTS HTML ---
-// Anciens écrans
+// (Inchangé)
 const configEcran = document.getElementById('configuration-ecran');
 const scoreEcran = document.getElementById('score-ecran');
-const revealEcran = document.getElementById('reveal-ecran');
 const podiumEcran = document.getElementById('podium-ecran');
-
-// Nouveaux éléments du Lobby (Configuration)
-const nomCreateurInput = document.getElementById('nom-createur');
-const couleurCreateurInput = document.getElementById('couleur-createur');
-const creerPartieBtn = document.getElementById('creer-partie-btn');
-const codePartieAffichage = document.getElementById('code-partie-affichage');
-const codePartieSpan = document.getElementById('code-partie');
-const copierCodeBtn = document.getElementById('copier-code-btn');
-const attenteJoueursMsg = document.getElementById('attente-joueurs-msg');
-const codePartieInput = document.getElementById('code-partie-input');
-const nomRejoindreInput = document.getElementById('nom-rejoindre');
-const couleurRejoindreInput = document.getElementById('couleur-rejoindre');
-const rejoindrePartieBtn = document.getElementById('rejoindre-partie-btn');
-const rejoindreErreurMsg = document.getElementById('rejoindre-erreur');
-const lobbyJoueursDiv = document.getElementById('lobby-joueurs');
-const listeJoueursLobbyDiv = document.getElementById('liste-joueurs-lobby');
-const optionsCreateurDiv = document.getElementById('options-createur');
-const lancerPartieBtn = document.getElementById('lancer-partie-btn');
-const attenteLancementMsg = document.getElementById('attente-lancement-msg');
-
-// Éléments des autres écrans
-const listeJoueursConf = document.getElementById('liste-joueurs-conf'); // Gardé pour référence si besoin
+const nomJoueurInput = document.getElementById('nom-joueur');
+const ajouterBouton = document.getElementById('ajouter-joueur');
+const demarrerBouton = document.getElementById('demarrer-partie');
+const listeJoueursConf = document.getElementById('liste-joueurs-conf');
 const scoreAffichageDiv = document.getElementById('score-affichage');
 const saisiePointsDiv = document.getElementById('saisie-points');
 const validerTourBouton = document.getElementById('valider-tour');
 const modeSecretConfig = document.getElementById('mode-secret-config');
-const conditionVictoireRadios = document.querySelectorAll('input[name="condition-victoire"]');
 const arreterMaintenantBouton = document.getElementById('arreter-maintenant');
 const canvasGraphique = document.getElementById('graphique-scores');
+const couleurJoueurInput = document.getElementById('couleur-joueur');
+const revealEcran = document.getElementById('reveal-ecran');
 const revealContent = document.getElementById('reveal-content');
 const revealRang = document.getElementById('reveal-rang');
 const revealNom = document.getElementById('reveal-nom');
@@ -80,372 +58,297 @@ const nbManchesTotalInput = document.getElementById('nb-manches-total');
 const nbManchesRestantesInput = document.getElementById('nb-manches-restantes');
 
 
-// --- FONCTIONS FIREBASE ---
+// --- FONCTIONS UTILITAIRES ---
 
-function genererCodePartie() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    let code = '';
-    for (let i = 0; i < 4; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
+function pause(ms) { /* ... (inchangé) ... */
+    return new Promise(resolve => {
+        const timer = setTimeout(() => { currentStepSkipper = null; resolve(); }, ms);
+        currentStepSkipper = () => { clearTimeout(timer); currentStepSkipper = null; resolve(); };
+    });
+}
+function attendreFinAnimation(element) { /* ... (inchangé) ... */
+    return new Promise(resolve => {
+        const onAnimEnd = () => { currentStepSkipper = null; resolve(); };
+        element.addEventListener('animationend', onAnimEnd, { once: true });
+        currentStepSkipper = () => { element.removeEventListener('animationend', onAnimEnd); currentStepSkipper = null; resolve(); };
+    });
 }
 
-// Fonction pour créer la partie (sans les alertes de débogage)
-async function creerPartie() {
-    const nom = nomCreateurInput.value.trim();
-    const couleur = couleurCreateurInput.value;
-    if (!nom) {
-        alert("Veuillez entrer votre nom.");
-        return;
+/**
+ * NOUVEAU : Calcule les rangs en gérant les égalités
+ */
+function calculerRangs(joueursTries) {
+    let rangActuel = 0;
+    let scorePrecedent = null;
+    let nbExAequo = 1;
+
+    joueursTries.forEach((joueur, index) => {
+        if (joueur.scoreTotal !== scorePrecedent) {
+            rangActuel += nbExAequo;
+            nbExAequo = 1;
+        } else {
+            nbExAequo++;
+        }
+        joueur.rang = rangActuel;
+        scorePrecedent = joueur.scoreTotal;
+    });
+    return joueursTries; // Retourne la liste avec la propriété 'rang' ajoutée
+}
+
+
+// (Fonction retirerJoueur - Inchangée)
+function retirerJoueur(index) { /* ... (inchangé) ... */
+    joueurs.splice(index, 1);
+    mettreAJourListeJoueurs();
+    verifierPeutDemarrer();
+ }
+// (Fonction mettreAJourListeJoueurs - Inchangée)
+function mettreAJourListeJoueurs() { /* ... (inchangé) ... */
+    listeJoueursConf.innerHTML = '';
+    if (joueurs.length === 0) { listeJoueursConf.innerHTML = '<p>Ajoutez au moins deux joueurs pour commencer.</p>'; return; }
+    joueurs.forEach((joueur, index) => {
+        const tag = document.createElement('div'); tag.className = 'joueur-tag';
+        const swatch = document.createElement('span'); swatch.className = 'joueur-couleur-swatch'; swatch.style.backgroundColor = joueur.couleur;
+        const nom = document.createElement('span'); nom.textContent = joueur.nom;
+        const retirerBtn = document.createElement('button'); retirerBtn.className = 'bouton-retirer'; retirerBtn.innerHTML = '&times;'; retirerBtn.title = `Retirer ${joueur.nom}`;
+        retirerBtn.addEventListener('click', () => { retirerJoueur(index); });
+        tag.appendChild(swatch); tag.appendChild(nom); tag.appendChild(retirerBtn); listeJoueursConf.appendChild(tag);
+    });
+}
+// (Fonction verifierPeutDemarrer - Inchangée)
+function verifierPeutDemarrer() { /* ... (inchangé) ... */ demarrerBouton.disabled = joueurs.length < 2; }
+// (Fonction genererChampsSaisie - Inchangée)
+function genererChampsSaisie() { /* ... (inchangé) ... */
+    saisiePointsDiv.innerHTML = '';
+    joueurs.forEach((joueur, index) => {
+        const div = document.createElement('div'); div.className = 'saisie-item';
+        div.innerHTML = ` <label for="score-${index}"> <span class="score-couleur-swatch" style="background-color: ${joueur.couleur};"></span> ${joueur.nom} : </label> <input type="number" id="score-${index}" value="0"> `;
+        saisiePointsDiv.appendChild(div);
+    });
+}
+
+/**
+ * MODIFIÉ : Utilise le rang calculé si non secret
+ */
+function mettreAJourScoresAffichage() {
+    scoreAffichageDiv.innerHTML = '';
+    let listePourAffichage = [];
+
+    // On recalcule les rangs uniquement si on n'est pas en mode secret
+    if (!scoresSecrets) {
+        let joueursTries = [...joueurs].sort((a, b) => {
+            return lowScoreWins ? a.scoreTotal - b.scoreTotal : b.scoreTotal - a.scoreTotal;
+        });
+        listePourAffichage = calculerRangs(joueursTries); // Ajoute la propriété 'rang'
+    } else {
+        listePourAffichage = joueurs; // Pas de tri, pas de rangs
     }
 
-    creerPartieBtn.disabled = true;
-    const nouveauCode = genererCodePartie();
-    partieId = nouveauCode;
-    joueurId = db.collection('parties').doc().id; // Génère ID joueur
-    createurId = joueurId;
+    let html = '<table class="classement-table">';
+    html += '<thead><tr><th>#</th><th>Joueur</th><th>Total</th></tr></thead>';
+    html += '<tbody>';
 
-    const nouveauJoueur = {
-        id: joueurId,
-        nom: nom,
-        couleur: couleur,
-        scoreTotal: 0,
-        scoresTour: [],
-        estCreateur: true
+    listePourAffichage.forEach((joueur) => { // Pas besoin d'index ici
+        // Utilise le rang calculé s'il existe, sinon '-'
+        const rangAffichage = joueur.rang && !scoresSecrets ? joueur.rang : '-';
+
+        html += `
+            <tr>
+                <td>${rangAffichage}</td>
+                <td>
+                    <span class="score-couleur-swatch" style="background-color: ${joueur.couleur};"></span>
+                    ${joueur.nom}
+                </td>
+                <td class="score-total">${scoresSecrets ? '???' : `${joueur.scoreTotal} pts`}</td>
+            </tr>
+        `;
+    });
+    html += '</tbody></table>';
+    scoreAffichageDiv.innerHTML = html;
+}
+
+
+// (Fonctions mettreAJourCompteurs, verifierConditionsArret - Inchangées)
+function mettreAJourCompteurs() { /* ... (inchangé) ... */
+    manchesPasseesAffichage.textContent = mancheActuelle;
+    let restantesManches = Infinity; let afficherManchesRestantes = false;
+    if (conditionsArret.manche_total.active) { const totalManches = conditionsArret.manche_total.mancheCible; restantesManches = Math.max(0, totalManches - mancheActuelle); afficherManchesRestantes = true; }
+    if (conditionsArret.manche_restante.active) { const mancheCible = conditionsArret.manche_restante.mancheCible; const restantesDynamiques = Math.max(0, mancheCible - mancheActuelle); restantesManches = Math.min(restantesManches, restantesDynamiques); afficherManchesRestantes = true; }
+    if (afficherManchesRestantes) { manchesRestantesAffichage.textContent = restantesManches; manchesRestantesAffichageDiv.classList.remove('cache'); } else { manchesRestantesAffichageDiv.classList.add('cache'); }
+    let pointsMinRestants = Infinity; let afficherPointsRestants = false;
+    if (conditionsArret.score_limite.active) { const scoreMax = Math.max(...joueurs.map(j => j.scoreTotal)); const restantsAbsolu = Math.max(0, conditionsArret.score_limite.valeur - scoreMax); pointsMinRestants = Math.min(pointsMinRestants, restantsAbsolu); afficherPointsRestants = true; }
+    if (conditionsArret.score_relatif.active) { joueurs.forEach(joueur => { let limiteCible = (joueur.scoreRelatifPivot || 0) + conditionsArret.score_relatif.valeur; const restantsRelatif = Math.max(0, limiteCible - joueur.scoreTotal); pointsMinRestants = Math.min(pointsMinRestants, restantsRelatif); }); afficherPointsRestants = true; }
+    if (afficherPointsRestants) { pointsRestantsAffichage.textContent = pointsMinRestants; pointsRestantsAffichageDiv.classList.remove('cache'); } else { pointsRestantsAffichageDiv.classList.add('cache'); }
+}
+function verifierConditionsArret() { /* ... (inchangé) ... */
+    if (validerTourBouton.disabled) return; let doitTerminer = false;
+    if (conditionsArret.score_limite.active && conditionsArret.score_limite.valeur > 0) { if (joueurs.some(j => j.scoreTotal >= conditionsArret.score_limite.valeur)) { doitTerminer = true; } }
+    if (conditionsArret.score_relatif.active && conditionsArret.score_relatif.valeur > 0) { joueurs.forEach(joueur => { let limiteCible = (joueur.scoreRelatifPivot || 0) + conditionsArret.score_relatif.valeur; if (joueur.scoreTotal >= limiteCible) { doitTerminer = true; } }); }
+    if (conditionsArret.manche_total.active && mancheActuelle >= conditionsArret.manche_total.mancheCible && conditionsArret.manche_total.mancheCible > 0) { doitTerminer = true; }
+    if (conditionsArret.manche_restante.active && mancheActuelle >= conditionsArret.manche_restante.mancheCible && conditionsArret.manche_restante.mancheCible > 0) { doitTerminer = true; }
+    if (doitTerminer) { terminerPartie(); }
+}
+
+/**
+ * MODIFIÉ : Utilise les rangs calculés pour remplir le podium et la liste
+ */
+function construirePodiumFinal() {
+    currentStepSkipper = null;
+    const podiumMap = {
+        1: document.getElementById('podium-1'),
+        2: document.getElementById('podium-2'),
+        3: document.getElementById('podium-3')
     };
 
-    try {
-        await db.collection('parties').doc(partieId).set({
-            code: partieId,
-            createurId: createurId,
-            joueurs: [nouveauJoueur],
-            etatPartie: 'lobby',
-            mancheActuelle: 0,
-            scoresSecrets: modeSecretConfig.checked, // Utilise la valeur initiale
-            lowScoreWins: document.querySelector('input[name="condition-victoire"]:checked').value === 'low', // Utilise la valeur initiale
-            conditionsArret: conditionsArret,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+    // Réinitialise les blocs podium (enlève 'cache' si ajouté précédemment)
+    Object.values(podiumMap).forEach(el => el.classList.remove('cache'));
 
-        // Affiche le code et met à jour l'UI du lobby
-        codePartieSpan.textContent = partieId;
-        codePartieAffichage.classList.remove('cache');
-        attenteJoueursMsg.classList.remove('cache');
-        document.querySelector('.lobby-section:nth-child(2)').classList.add('cache'); // Cache "Rejoindre"
-        creerPartieBtn.classList.add('cache');
-        nomCreateurInput.disabled = true;
-        couleurCreateurInput.disabled = true;
+    // Trouve les joueurs pour chaque place (peuvent être plusieurs en cas d'égalité)
+    const premier = classementFinal.filter(j => j.rang === 1);
+    const deuxieme = classementFinal.filter(j => j.rang === 2);
+    const troisieme = classementFinal.filter(j => j.rang === 3);
 
-        ecouterPartie(partieId); // Lance l'écouteur qui affichera la liste des joueurs etc.
-
-    } catch (error) {
-        alert("ERREUR Firebase lors de la création : " + error.message);
-        console.error("Erreur lors de la création de la partie:", error);
-        alert("Impossible de créer la partie. Vérifiez votre connexion ou réessayez.");
-        creerPartieBtn.disabled = false;
-        partieId = null;
-        joueurId = null;
-        createurId = null;
-    }
-}
-
-// Fonction pour rejoindre (avec message d'erreur précis)
-async function rejoindrePartie() {
-    const code = codePartieInput.value.trim().toUpperCase();
-    const nom = nomRejoindreInput.value.trim();
-    const couleur = couleurRejoindreInput.value;
-
-    if (!code || !nom) {
-        rejoindreErreurMsg.textContent = "Veuillez entrer le code et votre nom.";
-        rejoindreErreurMsg.classList.remove('cache');
-        return;
-    }
-    rejoindreErreurMsg.classList.add('cache');
-    rejoindrePartieBtn.disabled = true;
-
-    const partieRef = db.collection('parties').doc(code);
-
-    try {
-        const doc = await partieRef.get();
-
-        if (!doc.exists) {
-            throw new Error("Code de partie invalide."); // Lance une erreur
-        }
-
-        const partieData = doc.data();
-
-        if (partieData.joueurs && partieData.joueurs.some(j => j.nom === nom)) {
-             throw new Error(`Le nom "${nom}" est déjà pris dans cette partie.`); // Lance une erreur
-        }
-
-        if (partieData.etatPartie !== 'lobby') {
-             throw new Error("Cette partie a déjà commencé ou est terminée."); // Lance une erreur
-        }
-
-        partieId = code;
-        joueurId = db.collection('parties').doc().id; // Génère ID unique pour ce joueur
-
-        const nouveauJoueur = {
-            id: joueurId,
-            nom: nom,
-            couleur: couleur,
-            scoreTotal: 0,
-            scoresTour: [],
-            estCreateur: false
-        };
-
-        // Ajoute le nouveau joueur à la liste des joueurs dans Firestore
-        await partieRef.update({
-            joueurs: firebase.firestore.FieldValue.arrayUnion(nouveauJoueur)
-        });
-
-        // Cache les options de création/rejoindre APRES succès de l'update
-        document.querySelector('.lobby-section:nth-child(1)').classList.add('cache');
-        document.querySelector('.lobby-section:nth-child(2)').classList.add('cache');
-
-        // Commence à écouter les changements sur CETTE partie APRES succès de l'update
-        ecouterPartie(partieId);
-        // L'écouteur va maintenant s'occuper d'afficher le lobby correctement
-
-    } catch (error) {
-        console.error("Erreur pour rejoindre la partie:", error);
-        rejoindreErreurMsg.textContent = `Impossible de rejoindre: ${error.message || "Vérifiez code/connexion"}`;
-        rejoindreErreurMsg.classList.remove('cache');
-        rejoindrePartieBtn.disabled = false; // Réactive le bouton en cas d'erreur
-        partieId = null; // Réinitialise si échec
-        joueurId = null;
-    }
-}
-
-// Fonction pour écouter la partie (essentielle !)
-function ecouterPartie(codePartie) {
-    if (unsubscribePartie) {
-        unsubscribePartie();
-    }
-
-    console.log(`Écoute de la partie ${codePartie} démarrée pour joueur ${joueurId}`); // Debug
-
-    unsubscribePartie = db.collection('parties').doc(codePartie)
-        .onSnapshot((doc) => {
-            console.log("Données reçues de Firebase:", doc.data()); // Debug
-            if (!doc.exists) {
-                alert("La partie a été supprimée ou n'existe plus.");
-                if (unsubscribePartie) unsubscribePartie(); // Arrête l'écoute
-                // Recharge la page pour revenir à l'état initial
-                window.location.reload();
-                return;
-            }
-
-            const partieData = doc.data();
-            // Met à jour les variables globales avec les données de Firebase
-            joueurs = partieData.joueurs || [];
-            createurId = partieData.createurId;
-            mancheActuelle = partieData.mancheActuelle || 0;
-            scoresSecrets = partieData.scoresSecrets || false;
-            lowScoreWins = partieData.lowScoreWins !== undefined ? partieData.lowScoreWins : true;
-            conditionsArret = partieData.conditionsArret || conditionsArret; // Récupère les conditions
-
-             // S'assure que joueurId est défini (si on rejoint)
-             if (!joueurId) {
-                const moi = joueurs.find(j => j.nom === nomRejoindreInput.value.trim()); // Tentative de retrouver son ID
-                if (moi) joueurId = moi.id;
-             }
-             console.log("État actuel:", partieData.etatPartie, " Joueurs:", joueurs); // Debug
-
-             // Met à jour l'interface en fonction de l'état de la partie
-            mettreAJourUI(partieData.etatPartie);
-
-        }, (error) => {
-            console.error("Erreur d'écoute de la partie:", error);
-            alert("Erreur de connexion avec la partie: " + error.message);
-            if (unsubscribePartie) unsubscribePartie();
-            // Optionnel: Recharger la page ou afficher un message permanent
-            // window.location.reload();
-        });
-}
-
-// Fonction pour mettre à jour l'UI (essentielle !)
-function mettreAJourUI(etatPartie) {
-    console.log("Mise à jour UI pour état:", etatPartie); // Debug
-    // Cache tous les écrans principaux par défaut
-    configEcran.classList.add('cache');
-    scoreEcran.classList.add('cache');
-    revealEcran.classList.add('cache');
-    podiumEcran.classList.add('cache');
-
-    if (etatPartie === 'lobby') {
-        console.log("Affichage du Lobby"); // Debug
-        configEcran.classList.remove('cache');
-        // Affiche la section joueurs connectés seulement si on est dans une partie
-        if (partieId) {
-             // Cache Créer/Rejoindre si on est déjà dans une partie
-             document.querySelector('.lobby-section:nth-child(1)').classList.add('cache');
-             document.querySelector('.lobby-section:nth-child(2)').classList.add('cache');
-             // Affiche les joueurs et options
-             afficherLobbyJoueurs();
-             lobbyJoueursDiv.classList.remove('cache');
+    // Fonction pour remplir un bloc podium
+    const remplirPlace = (element, joueursPlace) => {
+        if (joueursPlace.length > 0) {
+            // Prend le premier joueur pour la couleur et le score (ils sont identiques)
+            const joueurRef = joueursPlace[0];
+            // Liste tous les noms
+            const noms = joueursPlace.map(j => j.nom).join(' & ');
+            element.querySelector('.podium-nom').textContent = noms;
+            element.querySelector('.podium-score').textContent = `${joueurRef.scoreTotal} pts`;
+            element.style.borderColor = joueurRef.couleur;
+            element.style.boxShadow = `0 0 15px ${joueurRef.couleur}80`;
         } else {
-             // Si pas dans une partie, montre Créer/Rejoindre et cache le reste
-             document.querySelector('.lobby-section:nth-child(1)').classList.remove('cache');
-             document.querySelector('.lobby-section:nth-child(2)').classList.remove('cache');
-             lobbyJoueursDiv.classList.add('cache');
-              // S'assure que les champs/boutons sont réactivés si on a quitté une partie
-             creerPartieBtn.disabled = false;
-             creerPartieBtn.classList.remove('cache');
-             nomCreateurInput.disabled = false;
-             couleurCreateurInput.disabled = false;
-             rejoindrePartieBtn.disabled = false;
-             codePartieAffichage.classList.add('cache');
-             attenteJoueursMsg.classList.add('cache');
+            element.classList.add('cache'); // Cache la place si personne n'a ce rang
         }
+    };
 
-    } else if (etatPartie === 'en_cours') {
-        console.log("Affichage de l'écran Score"); // Debug
-        scoreEcran.classList.remove('cache');
-        // Initialiser ou mettre à jour l'écran de score
-        if (!monGraphique && canvasGraphique) { // Vérifie aussi que le canvas existe
-            genererChampsSaisie();
-             creerGraphique();
-        }
-        mettreAJourScoresAffichage();
-        mettreAJourCompteurs();
-        mettreAJourGraphique();
-    } else if (etatPartie === 'terminee') {
-        console.log("Affichage de l'écran Podium"); // Debug
-         // La logique de fin (calcul rangs, etc.) est maintenant dans terminerPartieLogiqueLocale
-         // Appeler cette logique ici si elle n'a pas déjà été déclenchée par terminerPartieFirebase
-         // (par exemple si un joueur rejoint tardivement une partie terminée)
-         if(classementFinal.length === 0 && joueurs.length > 0) { // Si pas déjà calculé
-             terminerPartieLogiqueLocale(); // Calcule les rangs et lance potentiellement la séquence reveal
-         } else if (!revealEcran.classList.contains('cache')) {
-            // Si la séquence reveal est en cours, ne rien faire ici
-         }
-         else {
-             // Si la séquence est finie ou n'a pas eu lieu, affiche le podium direct
-             podiumEcran.classList.remove('cache');
-             construirePodiumFinal();
-         }
-    }
-}
+    remplirPlace(podiumMap[1], premier);
+    remplirPlace(podiumMap[2], deuxieme);
+    remplirPlace(podiumMap[3], troisieme);
 
-// Fonction pour afficher le lobby (essentielle !)
-function afficherLobbyJoueurs() {
-     listeJoueursLobbyDiv.innerHTML = ''; // Vide la liste
+    // Remplit la liste des "autres joueurs" (rang 4+)
+    const autresListe = document.getElementById('autres-joueurs-liste');
+    autresListe.innerHTML = '';
+    const autresJoueurs = classementFinal.filter(j => j.rang > 3); // Sélectionne par rang
 
-     joueurs.forEach((joueur) => {
-        const tag = document.createElement('div');
-        tag.className = 'joueur-tag';
-        const swatch = document.createElement('span');
-        swatch.className = 'joueur-couleur-swatch';
-        swatch.style.backgroundColor = joueur.couleur;
-        const nom = document.createElement('span');
-        nom.textContent = joueur.nom + (joueur.id === createurId ? ' (Créateur)' : '');
-        if (joueur.id === joueurId) {
-             nom.textContent += ' (Vous)';
-             nom.style.fontWeight = 'bold';
-        }
-
-        tag.appendChild(swatch);
-        tag.appendChild(nom);
-        listeJoueursLobbyDiv.appendChild(tag);
-    });
-
-    const estCreateur = (joueurId === createurId);
-    optionsCreateurDiv.classList.toggle('cache', !estCreateur);
-    attenteLancementMsg.classList.toggle('cache', estCreateur);
-
-    if (estCreateur) {
-        lancerPartieBtn.disabled = joueurs.length < 2;
-        // Met à jour les options affichées avec les valeurs actuelles de Firebase
-        modeSecretConfig.checked = scoresSecrets;
-        conditionVictoireRadios.forEach(radio => {
-             radio.checked = (lowScoreWins && radio.value === 'low') || (!lowScoreWins && radio.value === 'high');
+    if(autresJoueurs.length === 0) {
+        document.getElementById('autres-joueurs').classList.add('cache');
+    } else {
+        document.getElementById('autres-joueurs').classList.remove('cache');
+        // Trie les autres joueurs par rang (même s'ils devraient déjà l'être)
+        autresJoueurs.sort((a, b) => a.rang - b.rang);
+        autresJoueurs.forEach((joueur) => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span class="score-couleur-swatch" style="background-color: ${joueur.couleur};"></span>
+                <strong>${joueur.rang}. ${joueur.nom}</strong> (${joueur.scoreTotal} pts)
+            `;
+            autresListe.appendChild(li);
         });
     }
-}
 
-// Fonction pour lancer la partie (inchangée)
-async function lancerPartie() {
-    if (joueurId !== createurId || joueurs.length < 2) return;
-
-    // Récupère les dernières valeurs des options avant de lancer
-    scoresSecrets = modeSecretConfig.checked;
-    lowScoreWins = document.querySelector('input[name="condition-victoire"]:checked').value === 'low';
-
-    try {
-        await db.collection('parties').doc(partieId).update({
-            etatPartie: 'en_cours',
-            scoresSecrets: scoresSecrets, // Sauvegarde l'option
-            lowScoreWins: lowScoreWins,   // Sauvegarde l'option
-            mancheActuelle: 0
-        });
-        // onSnapshot s'occupera du changement d'écran
-    } catch (error) {
-        console.error("Erreur lors du lancement de la partie:", error);
-        alert("Impossible de lancer la partie.");
+    // Déplacement du graphique
+    const graphContainer = document.querySelector('.graphique-container');
+    const graphPlaceholder = document.getElementById('graphique-final-container');
+    if (graphContainer && graphPlaceholder) {
+        graphPlaceholder.innerHTML = '';
+        graphPlaceholder.appendChild(graphContainer);
+        if (monGraphique) {
+             monGraphique.resize();
+        }
     }
 }
 
-// Fonction valider tour (inchangée)
-async function validerTourFirebase() {
-     if (validerTourBouton.disabled) return;
-     let scoresJoueursMisAJour = JSON.parse(JSON.stringify(joueurs)); // Copie profonde
+/**
+ * MODIFIÉ : Utilise le rang calculé pour l'affichage
+ */
+function majContenuReveal(rang, joueur, estExAequoPrecedent) {
+    let rangTexte = `${rang}ème Place`;
+    // Gère l'affichage pour les ex aequo et les médailles
+    if (estExAequoPrecedent) {
+         rangTexte = `Ex æquo ${rang}ème Place`;
+    }
+    if (rang === 3) rangTexte = `🥉 ${estExAequoPrecedent ? 'Ex æquo ' : ''}3ème Place`;
+    if (rang === 1) rangTexte = `🥇 GAGNANT ${estExAequoPrecedent ? 'Ex æquo ' : ''}!`;
 
-     scoresJoueursMisAJour.forEach((joueur, index) => {
-        const inputElement = document.getElementById(`score-${index}`);
-        if(inputElement) {
-            const points = parseInt(inputElement.value, 10) || 0;
-            // Met à jour la copie
-            joueur.scoreTotal += points;
-            // Assure que scoresTour est un tableau
-            if (!Array.isArray(joueur.scoresTour)) {
-                joueur.scoresTour = [];
-            }
-            joueur.scoresTour.push(points);
-            inputElement.value = 0;
+
+    revealRang.textContent = rangTexte;
+    revealNom.textContent = joueur.nom;
+    revealNom.style.color = joueur.couleur;
+    revealScore.textContent = `${joueur.scoreTotal} points`;
+
+    revealContent.classList.remove('is-revealed');
+}
+
+
+/**
+ * MODIFIÉ : Utilise les rangs et gère l'affichage ex aequo
+ */
+async function demarrerSequenceReveal() {
+    scoreEcran.classList.add('cache');
+    revealEcran.classList.remove('cache');
+
+    // Le classementFinal contient maintenant les joueurs triés AVEC leur rang calculé
+    // classementFinal = calculerRangs([...joueurs].sort(...)); // Déjà fait dans terminerPartie
+
+    // Crée la liste des joueurs à révéler : 5e, 4e, 3e, 1er
+    let joueursAReveler = [];
+    // Ajoute tous ceux qui ne sont pas 1er ou 2ème, du dernier au 3ème
+    joueursAReveler.push(...classementFinal.filter(j => j.rang > 2).reverse());
+    // Ajoute le(s) 1er(s)
+    joueursAReveler.push(...classementFinal.filter(j => j.rang === 1));
+
+
+    let rangPrecedent = null; // Pour détecter les ex aequo pendant la révélation
+
+    // Boucle de révélation
+    for (const joueur of joueursAReveler) {
+        if (sequenceForceStop) return;
+
+        // Le rang est maintenant une propriété de l'objet joueur
+        const rang = joueur.rang;
+        const estExAequo = (rang === rangPrecedent); // Est-ce le même rang que le précédent révélé ?
+
+        majContenuReveal(rang, joueur, estExAequo); // Passe l'info ex aequo
+
+        // Animations...
+        revealContent.classList.add('slide-in-from-left');
+        await attendreFinAnimation(revealContent);
+        revealContent.classList.remove('slide-in-from-left');
+        if (sequenceForceStop) return;
+        await pause(1500);
+        if (sequenceForceStop) return;
+        revealContent.classList.add('shake-reveal');
+        await attendreFinAnimation(revealContent);
+        revealContent.classList.remove('shake-reveal');
+        revealContent.classList.add('is-revealed');
+        if (sequenceForceStop) return;
+        await pause(2500);
+        if (sequenceForceStop) return;
+
+        // Glisse vers la droite (sauf pour le tout dernier joueur révélé, qui est le gagnant)
+        if (joueur !== joueursAReveler[joueursAReveler.length - 1]) {
+            revealContent.classList.add('slide-out-to-right');
+            await attendreFinAnimation(revealContent);
+            revealContent.classList.remove('slide-out-to-right', 'is-revealed');
         }
-     });
 
-     try {
-          await db.collection('parties').doc(partieId).update({
-               joueurs: scoresJoueursMisAJour, // Ecrase avec la copie mise à jour
-               mancheActuelle: firebase.firestore.FieldValue.increment(1)
-          });
-          // La vérification des conditions se fera via onSnapshot quand les données reviennent
-          // verifierConditionsArret(); // On commente pour éviter double appel potentiel
-     } catch (error) {
-          console.error("Erreur lors de la validation du tour:", error);
-          alert("Erreur lors de la sauvegarde des scores.");
-     }
+        rangPrecedent = rang; // Mémorise le rang pour la prochaine itération
+    }
+
+    // Fin de la séquence, affiche le podium
+    revealEcran.classList.add('cache');
+    podiumEcran.classList.remove('cache');
+    construirePodiumFinal(); // Utilise classementFinal qui a les rangs
 }
 
-// Fonction terminer partie (inchangée)
-async function terminerPartieFirebase() {
-     if (!partieId) return;
-     try {
-          // Met à jour l'état ET s'assure que scoresSecrets est bien false à la fin
-          await db.collection('parties').doc(partieId).update({
-               etatPartie: 'terminee',
-               scoresSecrets: false // Force la révélation des scores dans la DB
-          });
-          // onSnapshot déclenchera terminerPartieLogiqueLocale via mettreAJourUI
-     } catch (error) {
-          console.error("Erreur lors de la fin de partie:", error);
-          alert("Impossible de terminer la partie correctement.");
-     }
-}
 
-// --- ANCIENNES FONCTIONS ADAPTÉES ---
-
-function calculerRangs(joueursTries) { /* ... (inchangé) ... */ }
-function construirePodiumFinal() { /* ... (inchangé) ... */ }
-function majContenuReveal(rang, joueur, estExAequoPrecedent) { /* ... (inchangé) ... */ }
-async function demarrerSequenceReveal() { /* ... (inchangé) ... */ }
-
-// Fonction pour la logique locale de fin de partie (calculs, reconstruction graphique si besoin)
-function terminerPartieLogiqueLocale() {
-    console.log("Déclenchement logique fin de partie locale"); // Debug
+/**
+ * MODIFIÉ : Calcule les rangs avant de lancer la séquence
+ */
+function terminerPartie() {
     sequenceForceStop = false;
     validerTourBouton.disabled = true;
     arreterMaintenantBouton.disabled = true;
@@ -455,22 +358,20 @@ function terminerPartieLogiqueLocale() {
         graphContainer.classList.remove('cache');
     }
 
+     // --- ÉTAPE 1: Calculer le classement final AVEC les rangs ---
     let joueursTries = [...joueurs].sort((a, b) => {
         return lowScoreWins ? a.scoreTotal - b.scoreTotal : b.scoreTotal - a.scoreTotal;
     });
-    classementFinal = calculerRangs(joueursTries);
+    classementFinal = calculerRangs(joueursTries); // Stocke le résultat globalement
 
-    // Vérifie si la partie *était* secrète *avant* la mise à jour de Firebase
-    // On se base sur l'état de la checkbox qui était visible par le créateur
-    const etaitSecret = modeSecretConfig.checked; // Ou une autre variable si besoin
+    // --- ÉTAPE 2: Gérer le cas secret ---
+    if (scoresSecrets) {
+        scoresSecrets = false;
+        // Met à jour l'affichage du tableau pour montrer les scores et les RANGS calculés
+        mettreAJourScoresAffichage(); // Va utiliser classementFinal implicitement via le tri
 
-    if (etaitSecret && !scoresSecrets) { // Si elle était secrète et que Firebase l'a révélée
-         console.log("Mode secret détecté, reconstruction graphique..."); // Debug
-        // Met à jour l'affichage maintenant que scoresSecrets est false
-         mettreAJourScoresAffichage();
-
+        // Reconstruit le graphique car il était caché
         if (monGraphique) {
-            // (Code de reconstruction du graphique - inchangé)
             monGraphique.data.labels = ['Manche 0'];
             monGraphique.data.datasets.forEach(dataset => { dataset.data = [0]; });
             let scoreCumules = new Array(joueurs.length).fill(0);
@@ -479,88 +380,106 @@ function terminerPartieLogiqueLocale() {
                 joueurs.forEach((joueur, index) => {
                     const scoreDeCeTour = joueur.scoresTour[i] || 0;
                     scoreCumules[index] += scoreDeCeTour;
-                     if(monGraphique.data.datasets[index]) { // Vérif dataset existe
-                        monGraphique.data.datasets[index].data[i+1] = scoreCumules[index];
-                     }
+                     monGraphique.data.datasets[index].data[i+1] = scoreCumules[index];
                 });
             }
-             const maxDataLength = Math.max(0, ...monGraphique.data.datasets.map(d => d.data.length));
+             const maxDataLength = Math.max(...monGraphique.data.datasets.map(d => d.data.length));
              while(monGraphique.data.labels.length < maxDataLength) { monGraphique.data.labels.push(`Manche ${monGraphique.data.labels.length}`); }
             monGraphique.update();
             monGraphique.resize();
         }
 
         alert("FIN DE PARTIE : Les scores secrets sont révélés !");
+        // Lance la séquence APRÈS l'alerte
         setTimeout(demarrerSequenceReveal, 100);
     } else {
-         console.log("Mode normal ou déjà révélé, lancement séquence reveal..."); // Debug
-        // Met à jour l'affichage avec les rangs (si pas déjà fait)
-        mettreAJourScoresAffichage();
+        // Si pas secret, met à jour l'affichage avec les rangs
+         mettreAJourScoresAffichage();
+        // Lance la séquence directement
         demarrerSequenceReveal();
     }
 }
 
 
 // --- FONCTIONS GRAPHIQUE ---
-function genererCouleurAleatoire() { /* ... (inchangé) ... */ }
-function creerGraphique() { /* ... (inchangé) ... */ }
-function mettreAJourGraphique() {
-     // Ne met à jour que si le graphique existe et si la partie est en cours et non secrète
-     if (!monGraphique || scoreEcran.classList.contains('cache') || scoresSecrets) {
-        // console.log("Mise à jour graphique skipée (caché ou secret)"); // Debug
-        return;
-     }
-     // console.log("Mise à jour graphique pour manche", mancheActuelle); // Debug
 
+// (Fonction genererCouleurAleatoire - Inchangée)
+function genererCouleurAleatoire() { /* ... (inchangé) ... */
+    const couleurs = [ '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#E7E9ED', '#8036EB', '#FFAB91', '#81D4FA', '#FFF59D', '#A5D6A7' ];
+    let couleursPrises = joueurs.map(j => j.couleur.toUpperCase()); let couleurDispo = couleurs.find(c => !couleursPrises.includes(c));
+    if (couleurDispo) { return couleurDispo; } return '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+}
+// (Fonction creerGraphique - Inchangée)
+function creerGraphique() { /* ... (inchangé) ... */
+    if (monGraphique) { monGraphique.destroy(); }
+    const datasets = joueurs.map((joueur, index) => ({ label: joueur.nom, data: [0], borderColor: joueur.couleur, backgroundColor: joueur.couleur + '33', fill: false, tension: 0.1 }));
+    monGraphique = new Chart(canvasGraphique, { type: 'line', data: { labels: ['Manche 0'], datasets: datasets }, options: { responsive: true, plugins: { legend: { position: 'top' }, title: { display: false } }, scales: { y: { title: { display: true, text: 'Points' } }, x: { title: { display: true, text: 'Manches' } } } } });
+}
+// (Fonction mettreAJourGraphique - Inchangée, le correctif précédent était OK)
+function mettreAJourGraphique() { /* ... (inchangé) ... */
+     if (!monGraphique) { return; }
      const labelManche = 'Manche ' + mancheActuelle;
-     if (!monGraphique.data.labels.includes(labelManche) && mancheActuelle > 0) {
-         monGraphique.data.labels.push(labelManche);
-     }
-
+     if (!monGraphique.data.labels.includes(labelManche)) { monGraphique.data.labels.push(labelManche); }
      joueurs.forEach((joueur, index) => {
           if(monGraphique.data.datasets[index]) {
-             // Assure que le tableau data a assez d'éléments
-             while(monGraphique.data.datasets[index].data.length <= mancheActuelle) {
-                 monGraphique.data.datasets[index].data.push(null); // Ajoute des null si besoin
-             }
-             monGraphique.data.datasets[index].data[mancheActuelle] = joueur.scoreTotal;
+             if (monGraphique.data.datasets[index].data.length <= mancheActuelle) { monGraphique.data.datasets[index].data.push(joueur.scoreTotal); }
+             else { monGraphique.data.datasets[index].data[mancheActuelle] = joueur.scoreTotal; }
           }
      });
-
-     // S'assure qu'il y a assez de labels
-     const maxDataLength = Math.max(0, ...monGraphique.data.datasets.map(d => d.data.length));
-     while(monGraphique.data.labels.length < maxDataLength) {
-        monGraphique.data.labels.push(`Manche ${monGraphique.data.labels.length}`);
-     }
-
+     // Ne pas bloquer l'update, même si caché. La reconstruction à la fin gère le visuel.
      monGraphique.update();
 }
 
 
 // --- GESTION DES ÉVÉNEMENTS ---
-creerPartieBtn.addEventListener('click', creerPartie);
-rejoindrePartieBtn.addEventListener('click', rejoindrePartie);
-lancerPartieBtn.addEventListener('click', lancerPartie);
-copierCodeBtn.addEventListener('click', () => { /* ... (inchangé) ... */ });
-validerTourBouton.addEventListener('click', validerTourFirebase);
-arreterMaintenantBouton.addEventListener('click', terminerPartieFirebase);
-revealEcran.addEventListener('click', (e) => { /* ... (inchangé) ... */ });
-skipAllBtn.addEventListener('click', () => { /* ... (inchangé) ... */ });
-conditionCheckboxes.forEach(checkbox => { /* ... (inchangé) ... */ });
-[scoreLimiteInput, scoreRelatifInput, nbManchesTotalInput, nbManchesRestantesInput].forEach(input => { /* ... (inchangé) ... */ });
+
+// (Activation/désactivation des inputs numériques - Inchangé)
+conditionCheckboxes.forEach(checkbox => { /* ... (inchangé) ... */
+    checkbox.addEventListener('change', (e) => { const type = e.target.dataset.type; const inputId = inputIdMap[type]; const input = document.getElementById(inputId); if (input) { input.disabled = !checkbox.checked; } mettreAJourConditionsArret(); mettreAJourCompteurs(); }); });
+// (Mise à jour si changement de valeur numérique - Inchangé)
+[scoreLimiteInput, scoreRelatifInput, nbManchesTotalInput, nbManchesRestantesInput].forEach(input => { /* ... (inchangé) ... */ input.addEventListener('change', () => { mettreAJourConditionsArret(); mettreAJourCompteurs(); }); });
+// (Fonction mettreAJourConditionsArret - Inchangée)
+function mettreAJourConditionsArret() { /* ... (inchangé) ... */
+    for (const key in conditionsArret) { conditionsArret[key].active = false; }
+    document.querySelectorAll('.condition-checkbox:checked').forEach(checkbox => { const type = checkbox.dataset.type; conditionsArret[type].active = true; const inputId = inputIdMap[type]; const inputElement = document.getElementById(inputId); const valeur = parseInt(inputElement.value, 10) || 0; if (type === 'score_limite') { conditionsArret.score_limite.valeur = valeur; } else if (type === 'score_relatif') { conditionsArret[type].valeur = valeur; joueurs.forEach(j => { j.scoreRelatifPivot = j.scoreTotal; }); } else if (type === 'manche_total') { conditionsArret.manche_total.mancheCible = valeur; } else if (type === 'manche_restante') { conditionsArret.manche_restante.mancheCible = mancheActuelle + valeur; } });
+}
+
+// (Ajout d'un joueur - Inchangé)
+ajouterBouton.addEventListener('click', () => { /* ... (inchangé) ... */
+    const nom = nomJoueurInput.value.trim(); const couleur = couleurJoueurInput.value;
+    if (nom && !joueurs.some(j => j.nom === nom)) { joueurs.push({ nom: nom, couleur: couleur, scoreTotal: 0, scoresTour: [], scoreRelatifPivot: 0 }); nomJoueurInput.value = ''; couleurJoueurInput.value = genererCouleurAleatoire(); mettreAJourListeJoueurs(); verifierPeutDemarrer(); }
+    else if (joueurs.some(j => j.nom === nom)) { alert(`Le joueur "${nom}" existe déjà !`); }
+});
+nomJoueurInput.addEventListener('keypress', (e) => { /* ... (inchangé) ... */ if (e.key === 'Enter') { ajouterBouton.click(); } });
+
+// (Démarrage de la partie - Inchangé)
+demarrerBouton.addEventListener('click', () => { /* ... (inchangé) ... */
+    sequenceForceStop = false; if (joueurs.length < 2) return; scoresSecrets = modeSecretConfig.checked; const victoireChoix = document.querySelector('input[name="condition-victoire"]:checked').value; lowScoreWins = (victoireChoix === 'low'); mancheActuelle = 0;
+    joueurs.forEach(j => { j.scoreTotal = 0; j.scoresTour = []; j.scoreRelatifPivot = 0; j.rang = undefined; }); // Nettoie le rang
+    const graphContainer = document.querySelector('.graphique-container'); const graphOriginalParent = document.querySelector('.score-gauche'); const inputTourDiv = document.querySelector('.input-tour');
+    if (graphContainer && graphOriginalParent && inputTourDiv) { graphOriginalParent.insertBefore(graphContainer, inputTourDiv); }
+    podiumEcran.classList.add('cache'); revealEcran.classList.add('cache');
+    if (scoresSecrets) { if (graphContainer) graphContainer.classList.add('cache'); } else { if (graphContainer) graphContainer.classList.remove('cache'); }
+    mettreAJourConditionsArret(); configEcran.classList.add('cache'); scoreEcran.classList.remove('cache');
+    genererChampsSaisie(); mettreAJourScoresAffichage(); mettreAJourCompteurs(); creerGraphique();
+});
+
+// (Validation d'un tour - Inchangé)
+validerTourBouton.addEventListener('click', () => { /* ... (inchangé) ... */
+    if (validerTourBouton.disabled) return; mancheActuelle++;
+    joueurs.forEach((joueur, index) => { const inputElement = document.getElementById(`score-${index}`); const points = parseInt(inputElement.value, 10) || 0; joueur.scoreTotal += points; joueur.scoresTour.push(points); inputElement.value = 0; });
+    mettreAJourScoresAffichage(); mettreAJourCompteurs(); mettreAJourGraphique(); verifierConditionsArret();
+});
+
+// (Arrêt manuel - Inchangé)
+arreterMaintenantBouton.addEventListener('click', terminerPartie);
+
+// (Événements de Skip - Inchangés)
+revealEcran.addEventListener('click', (e) => { /* ... (inchangé) ... */ if (e.target.closest('#skip-all-btn') || e.target.closest('#reveal-content')) { return; } if (currentStepSkipper) { currentStepSkipper(); } });
+skipAllBtn.addEventListener('click', () => { /* ... (inchangé) ... */ sequenceForceStop = true; if (currentStepSkipper) { currentStepSkipper(); } revealEcran.classList.add('cache'); podiumEcran.classList.remove('cache'); construirePodiumFinal(); });
 
 
 // --- INITIALISATION ---
-// Assure que seul l'écran de config (lobby initial) est visible
-configEcran.classList.remove('cache');
-scoreEcran.classList.add('cache');
-revealEcran.classList.add('cache');
-podiumEcran.classList.add('cache');
-// Cache la section joueurs/options au début
-lobbyJoueursDiv.classList.add('cache');
-
-
-couleurCreateurInput.value = genererCouleurAleatoire();
-couleurRejoindreInput.value = genererCouleurAleatoire();
-
-console.log("Application initialisée. En attente d'action utilisateur."); // Debug
+mettreAJourListeJoueurs();
+verifierPeutDemarrer();
+couleurJoueurInput.value = genererCouleurAleatoire();
