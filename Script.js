@@ -444,12 +444,34 @@ function mettreAJourConditionsArret() { /* ... (inchangé) ... */
     document.querySelectorAll('.condition-checkbox:checked').forEach(checkbox => { const type = checkbox.dataset.type; conditionsArret[type].active = true; const inputId = inputIdMap[type]; const inputElement = document.getElementById(inputId); const valeur = parseInt(inputElement.value, 10) || 0; if (type === 'score_limite') { conditionsArret.score_limite.valeur = valeur; } else if (type === 'score_relatif') { conditionsArret[type].valeur = valeur; joueurs.forEach(j => { j.scoreRelatifPivot = j.scoreTotal; }); } else if (type === 'manche_total') { conditionsArret.manche_total.mancheCible = valeur; } else if (type === 'manche_restante') { conditionsArret.manche_restante.mancheCible = mancheActuelle + valeur; } });
 }
 
-// (Ajout d'un joueur - Inchangé)
-ajouterBouton.addEventListener('click', () => { /* ... (inchangé) ... */
-    const nom = nomJoueurInput.value.trim(); const couleur = couleurJoueurInput.value;
-    if (nom && !joueurs.some(j => j.nom === nom)) { joueurs.push({ nom: nom, couleur: couleur, scoreTotal: 0, scoresTour: [], scoreRelatifPivot: 0 }); nomJoueurInput.value = ''; couleurJoueurInput.value = genererCouleurAleatoire(); mettreAJourListeJoueurs(); verifierPeutDemarrer(); }
-    else if (joueurs.some(j => j.nom === nom)) { alert(`Le joueur "${nom}" existe déjà !`); }
+// (Ajout d'un joueur - CORRIGÉ)
+ajouterBouton.addEventListener('click', () => {
+    const nom = nomJoueurInput.value.trim();
+    const couleur = couleurJoueurInput.value;
+
+    // --- CORRECTION ---
+    // 1. Vérifier d'abord si le nom est vide
+    if (!nom) {
+        alert("Veuillez entrer un nom de joueur !");
+        nomJoueurInput.focus(); // Optionnel : remet le focus sur l'input
+        return; // Arrête la fonction ici
+    }
+
+    // 2. Vérifier ensuite si le joueur existe déjà
+    if (joueurs.some(j => j.nom === nom)) {
+        alert(`Le joueur "${nom}" existe déjà !`);
+        return; // Arrête la fonction ici
+    }
+    // --- FIN CORRECTION ---
+
+    // Si tout est bon, on ajoute le joueur (code inchangé)
+    joueurs.push({ nom: nom, couleur: couleur, scoreTotal: 0, scoresTour: [], scoreRelatifPivot: 0, rang: undefined });
+    nomJoueurInput.value = '';
+    couleurJoueurInput.value = genererCouleurAleatoire();
+    mettreAJourListeJoueurs();
+    verifierPeutDemarrer();
 });
+
 nomJoueurInput.addEventListener('keypress', (e) => { /* ... (inchangé) ... */ if (e.key === 'Enter') { ajouterBouton.click(); } });
 
 // (Démarrage de la partie - Inchangé)
