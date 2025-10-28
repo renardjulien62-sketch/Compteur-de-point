@@ -1,3 +1,11 @@
+
+alert("TEST : Le fichier script.js est BIEN chargé !");
+
+// --- VARIABLES GLOBALES ---
+let joueurs = []; // { nom, couleur, scoreTotal, scoresTour, scoreRelatifPivot, rang } <-- Ajout de rang
+// ... (le reste de votre code)
+
+
 // --- VARIABLES GLOBALES ---
 let joueurs = []; // { nom, couleur, scoreTotal, scoresTour, scoreRelatifPivot, rang } <-- Ajout de rang
 let scoresSecrets = false;
