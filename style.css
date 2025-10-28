@@ -13,9 +13,12 @@ h2 {
     padding-bottom: 5px;
     margin-top: 20px;
 }
+h3 {
+    margin-top: 0;
+}
 
 .cache {
-    display: none;
+    display: none !important;
 }
 
 /* --- Mise en page à deux colonnes pour l'écran de score --- */
@@ -44,12 +47,31 @@ h2 {
 }
 
 /* --- Éléments de Formulaire/Boutons --- */
-.input-group, .input-tour, .graphique-container { /* Ajouté .graphique-container */
+.input-group, .input-tour, .graphique-container { 
     margin-bottom: 20px;
     padding: 15px;
     border: 1px solid #ddd;
     background-color: #fff;
     border-radius: 8px;
+}
+.input-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+.label-couleur {
+    margin-left: 5px;
+    font-size: 0.9em;
+}
+input[type="color"] {
+    width: 40px;
+    height: 40px;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    background-color: transparent;
+    border-radius: 5px;
 }
 
 .fin-partie-options input[type="number"] {
@@ -59,7 +81,6 @@ h2 {
 
 input[type="text"], input[type="number"] {
     padding: 10px;
-    margin-right: 5px;
     border: 1px solid #ccc;
     border-radius: 4px;
     width: 150px;
@@ -72,7 +93,7 @@ button {
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.3s;
+    transition: background-color: 0.3s;
     margin-top: 5px;
 }
 
@@ -95,14 +116,43 @@ button:disabled {
 }
 
 /* --- Liste des joueurs (Configuration) --- */
+#liste-joueurs-conf {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
 .joueur-tag {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     background-color: #e9ecef;
     color: #333;
     padding: 7px 12px;
-    margin: 5px 5px 5px 0;
+    margin: 0; 
     border-radius: 20px;
     font-weight: bold;
+}
+.joueur-couleur-swatch {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    margin-right: 8px;
+    border: 1px solid #fff;
+    box-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
+.bouton-retirer {
+    background: none;
+    border: none;
+    color: #dc3545;
+    font-size: 1.3em;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0 0 0 10px;
+    margin: 0;
+    line-height: 1;
+}
+.bouton-retirer:hover {
+    color: #c82333;
 }
 
 /* --- Options Mode Secret, Victoire & Fin de partie --- */
@@ -119,6 +169,7 @@ button:disabled {
     font-weight: normal;
     cursor: pointer;
     margin-bottom: 10px;
+    width: 100%; 
 }
 .fin-partie-options label input[type="number"] {
     display: inline;
@@ -126,6 +177,7 @@ button:disabled {
 .option-victoire label {
     display: inline-block;
     margin-right: 15px;
+    width: auto; 
 }
 
 
@@ -148,23 +200,191 @@ button:disabled {
     color: #007bff;
     font-size: 1.1em;
 }
+.score-couleur-swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+    border: 1px solid #fff;
+    box-shadow: 0 0 2px rgba(0,0,0,0.3);
+}
 
-/* Style du podium */
+/* --- ▼▼▼ STYLES DE L'ÉCRAN DE RÉVÉLATION (NUAGE) ▼▼▼ --- */
+#reveal-ecran {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.75);
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    cursor: pointer; /* NOUVEAU: Montre qu'on peut cliquer */
+}
+
+#reveal-content {
+    background-color: white;
+    color: #333;
+    padding: 30px 50px;
+    border-radius: 40px;
+    text-align: center;
+    min-width: 400px;
+    max-width: 80%;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    transform: translateZ(0); 
+    cursor: default; /* NOUVEAU: Le nuage lui-même n'est pas cliquable */
+}
+
+#reveal-rang {
+    font-size: 2em;
+    color: #555;
+    margin: 0;
+}
+.reveal-nom-container {
+    position: relative;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#reveal-nom, #reveal-nom-placeholder {
+    font-size: 3.5em;
+    font-weight: bold;
+    margin: 10px 0;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    transition: opacity 0.3s ease-in-out;
+}
+#reveal-nom {
+    opacity: 0;
+}
+#reveal-nom-placeholder {
+    opacity: 1;
+}
+#reveal-content.is-revealed #reveal-nom {
+    opacity: 1;
+}
+#reveal-content.is-revealed #reveal-nom-placeholder {
+    opacity: 0;
+}
+#reveal-score {
+    font-size: 1.8em;
+    color: #444;
+    margin: 0;
+}
+
+/* NOUVEAU: Style du bouton Skip Total */
+#skip-all-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 102; /* Au-dessus de l'overlay */
+    width: auto; /* Annule le width: 100% de .bouton-fin */
+    margin: 0;
+}
+/* --- ▲▲▲ FIN DES STYLES DE RÉVÉLATION ▲▲▲ --- */
+
+
+/* --- ▼▼▼ ANIMATIONS (SECOUSSE, GLISSE) ▼▼▼ --- */
+.slide-in-from-left {
+    animation: slideInFromLeft 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+}
+.shake-reveal {
+    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+.slide-out-to-right {
+    animation: slideOutToRight 0.5s cubic-bezier(0.550, 0.085, 0.680, 0.530) both;
+}
+@keyframes slideInFromLeft {
+    0% { transform: translateX(-150%); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideOutToRight {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(150%); opacity: 0; }
+}
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+/* --- ▲▲▲ FIN DES ANIMATIONS ▲▲▲ --- */
+
+
+/* --- STYLES DU PODIUM VISUEL (Inchangé) --- */
 #podium-ecran {
     text-align: center;
 }
-/* Style pour le conteneur du graphique final */
+#podium-visuel {
+    display: flex;
+    align-items: flex-end; 
+    justify-content: center;
+    gap: 5px;
+    height: 300px;
+    margin: 20px 0;
+}
+.podium-place {
+    flex: 1;
+    max-width: 200px;
+    padding: 20px;
+    border-radius: 8px 8px 0 0;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+.podium-medaille {
+    font-size: 3em;
+}
+.podium-nom {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin: 10px 0;
+    word-wrap: break-word;
+}
+.podium-score {
+    font-size: 1.1em;
+}
+#podium-1 {
+    height: 250px;
+    background-color: gold;
+    order: 2;
+}
+#podium-2 {
+    height: 180px;
+    background-color: silver;
+    order: 1;
+}
+#podium-3 {
+    height: 130px;
+    background-color: #cd7f32; /* Bronze */
+    order: 3;
+}
+#autres-joueurs {
+    text-align: left;
+    max-width: 400px;
+    margin: 20px auto;
+}
+#autres-joueurs-liste {
+    list-style-type: none;
+    padding: 0;
+}
+#autres-joueurs-liste li {
+    font-size: 1.1em;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+/* --- ▲▲▲ FIN DES STYLES DU PODIUM ▲▲▲ --- */
+
+/* Conteneur du graphique final */
 #graphique-final-container {
     margin-top: 20px;
 }
-
-.podium-item {
-    padding: 15px;
-    margin: 10px 0;
-    border-radius: 8px;
-    font-size: 1.2em;
-    font-weight: bold;
-}
-.rang-1 { background-color: gold; }
-.rang-2 { background-color: silver; }
-.rang-3 { background-color: #cd7f32; }
