@@ -55,7 +55,7 @@ const lancerPartieBtn = document.getElementById('lancer-partie-btn');
 const attenteLancementMsg = document.getElementById('attente-lancement-msg');
 
 // Éléments des autres écrans
-const listeJoueursConf = document.getElementById('liste-joueurs-conf');
+const listeJoueursConf = document.getElementById('liste-joueurs-conf'); // Gardé pour référence si besoin
 const scoreAffichageDiv = document.getElementById('score-affichage');
 const saisiePointsDiv = document.getElementById('saisie-points');
 const validerTourBouton = document.getElementById('valider-tour');
@@ -91,9 +91,7 @@ function genererCodePartie() {
     return code;
 }
 
-/**
- * ▼▼▼ MODIFIÉ : Alertes retirées ▼▼▼
- */
+// Fonction pour créer la partie (sans les alertes de débogage)
 async function creerPartie() {
     const nom = nomCreateurInput.value.trim();
     const couleur = couleurCreateurInput.value;
@@ -124,42 +122,35 @@ async function creerPartie() {
             joueurs: [nouveauJoueur],
             etatPartie: 'lobby',
             mancheActuelle: 0,
-            scoresSecrets: false,
-            lowScoreWins: true,
+            scoresSecrets: modeSecretConfig.checked, // Utilise la valeur initiale
+            lowScoreWins: document.querySelector('input[name="condition-victoire"]:checked').value === 'low', // Utilise la valeur initiale
             conditionsArret: conditionsArret,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Affiche le code et cache les options
+        // Affiche le code et met à jour l'UI du lobby
         codePartieSpan.textContent = partieId;
-        codePartieAffichage.classList.remove('cache'); // Rend le <p> visible
+        codePartieAffichage.classList.remove('cache');
         attenteJoueursMsg.classList.remove('cache');
-        // Cache les sections "Créer" (déjà fait implicitement) et "Rejoindre"
-        document.querySelector('.lobby-section:nth-child(2)').classList.add('cache');
-         // Masque juste le bouton "Créer" au lieu de toute la section, garde le nom/couleur visible
+        document.querySelector('.lobby-section:nth-child(2)').classList.add('cache'); // Cache "Rejoindre"
         creerPartieBtn.classList.add('cache');
         nomCreateurInput.disabled = true;
         couleurCreateurInput.disabled = true;
 
-        ecouterPartie(partieId);
+        ecouterPartie(partieId); // Lance l'écouteur qui affichera la liste des joueurs etc.
 
     } catch (error) {
-        // Alerte en cas d'erreur Firebase
         alert("ERREUR Firebase lors de la création : " + error.message);
         console.error("Erreur lors de la création de la partie:", error);
-        alert("Impossible de créer la partie. Vérifiez votre connexion ou réessayez."); // Message générique
-        creerPartieBtn.disabled = false; // Réactive le bouton
+        alert("Impossible de créer la partie. Vérifiez votre connexion ou réessayez.");
+        creerPartieBtn.disabled = false;
         partieId = null;
         joueurId = null;
         createurId = null;
     }
 }
-// ▲▲▲ FIN MODIFICATION ▲▲▲
 
-
-/**
- * ▼▼▼ MODIFIÉ : Message d'erreur plus précis ▼▼▼
- */
+// Fonction pour rejoindre (avec message d'erreur précis)
 async function rejoindrePartie() {
     const code = codePartieInput.value.trim().toUpperCase();
     const nom = nomRejoindreInput.value.trim();
@@ -179,26 +170,17 @@ async function rejoindrePartie() {
         const doc = await partieRef.get();
 
         if (!doc.exists) {
-            rejoindreErreurMsg.textContent = "Code de partie invalide.";
-            rejoindreErreurMsg.classList.remove('cache');
-            rejoindrePartieBtn.disabled = false;
-            return;
+            throw new Error("Code de partie invalide."); // Lance une erreur
         }
 
         const partieData = doc.data();
 
         if (partieData.joueurs && partieData.joueurs.some(j => j.nom === nom)) {
-             rejoindreErreurMsg.textContent = `Le nom "${nom}" est déjà pris dans cette partie.`;
-             rejoindreErreurMsg.classList.remove('cache');
-             rejoindrePartieBtn.disabled = false;
-             return;
+             throw new Error(`Le nom "${nom}" est déjà pris dans cette partie.`); // Lance une erreur
         }
 
         if (partieData.etatPartie !== 'lobby') {
-             rejoindreErreurMsg.textContent = "Cette partie a déjà commencé ou est terminée.";
-             rejoindreErreurMsg.classList.remove('cache');
-             rejoindrePartieBtn.disabled = false;
-             return;
+             throw new Error("Cette partie a déjà commencé ou est terminée."); // Lance une erreur
         }
 
         partieId = code;
@@ -219,54 +201,253 @@ async function rejoindrePartie() {
         });
 
         // Cache les options de création/rejoindre APRES succès de l'update
-        document.querySelector('.lobby-section:nth-child(1)').classList.add('cache'); // Cache "Créer"
-        document.querySelector('.lobby-section:nth-child(2)').classList.add('cache'); // Cache "Rejoindre"
+        document.querySelector('.lobby-section:nth-child(1)').classList.add('cache');
+        document.querySelector('.lobby-section:nth-child(2)').classList.add('cache');
 
         // Commence à écouter les changements sur CETTE partie APRES succès de l'update
         ecouterPartie(partieId);
-        // Si on arrive ici, tout s'est bien passé, l'écouteur va gérer l'affichage du lobby
+        // L'écouteur va maintenant s'occuper d'afficher le lobby correctement
 
     } catch (error) {
         console.error("Erreur pour rejoindre la partie:", error);
-        // ▼▼▼ Message d'erreur plus précis ▼▼▼
         rejoindreErreurMsg.textContent = `Impossible de rejoindre: ${error.message || "Vérifiez code/connexion"}`;
-        // ▲▲▲ Fin Modification ▲▲▲
         rejoindreErreurMsg.classList.remove('cache');
-        rejoindrePartieBtn.disabled = false;
-        partieId = null;
+        rejoindrePartieBtn.disabled = false; // Réactive le bouton en cas d'erreur
+        partieId = null; // Réinitialise si échec
         joueurId = null;
     }
 }
-// ▲▲▲ FIN MODIFICATION ▲▲▲
 
-// (Fonction ecouterPartie - Inchangée)
-function ecouterPartie(codePartie) { /* ... (inchangé) ... */ }
-// (Fonction mettreAJourUI - Inchangée)
-function mettreAJourUI(etatPartie) { /* ... (inchangé) ... */ }
-// (Fonction afficherLobbyJoueurs - Inchangée)
-function afficherLobbyJoueurs() { /* ... (inchangé) ... */ }
-// (Fonction lancerPartie - Inchangée)
-async function lancerPartie() { /* ... (inchangé) ... */ }
-// (Fonction validerTourFirebase - Inchangée, correction précédente ok)
-async function validerTourFirebase() { /* ... (inchangé) ... */ }
-// (Fonction terminerPartieFirebase - Inchangée)
-async function terminerPartieFirebase() { /* ... (inchangé) ... */ }
+// Fonction pour écouter la partie (essentielle !)
+function ecouterPartie(codePartie) {
+    if (unsubscribePartie) {
+        unsubscribePartie();
+    }
 
+    console.log(`Écoute de la partie ${codePartie} démarrée pour joueur ${joueurId}`); // Debug
+
+    unsubscribePartie = db.collection('parties').doc(codePartie)
+        .onSnapshot((doc) => {
+            console.log("Données reçues de Firebase:", doc.data()); // Debug
+            if (!doc.exists) {
+                alert("La partie a été supprimée ou n'existe plus.");
+                if (unsubscribePartie) unsubscribePartie(); // Arrête l'écoute
+                // Recharge la page pour revenir à l'état initial
+                window.location.reload();
+                return;
+            }
+
+            const partieData = doc.data();
+            // Met à jour les variables globales avec les données de Firebase
+            joueurs = partieData.joueurs || [];
+            createurId = partieData.createurId;
+            mancheActuelle = partieData.mancheActuelle || 0;
+            scoresSecrets = partieData.scoresSecrets || false;
+            lowScoreWins = partieData.lowScoreWins !== undefined ? partieData.lowScoreWins : true;
+            conditionsArret = partieData.conditionsArret || conditionsArret; // Récupère les conditions
+
+             // S'assure que joueurId est défini (si on rejoint)
+             if (!joueurId) {
+                const moi = joueurs.find(j => j.nom === nomRejoindreInput.value.trim()); // Tentative de retrouver son ID
+                if (moi) joueurId = moi.id;
+             }
+             console.log("État actuel:", partieData.etatPartie, " Joueurs:", joueurs); // Debug
+
+             // Met à jour l'interface en fonction de l'état de la partie
+            mettreAJourUI(partieData.etatPartie);
+
+        }, (error) => {
+            console.error("Erreur d'écoute de la partie:", error);
+            alert("Erreur de connexion avec la partie: " + error.message);
+            if (unsubscribePartie) unsubscribePartie();
+            // Optionnel: Recharger la page ou afficher un message permanent
+            // window.location.reload();
+        });
+}
+
+// Fonction pour mettre à jour l'UI (essentielle !)
+function mettreAJourUI(etatPartie) {
+    console.log("Mise à jour UI pour état:", etatPartie); // Debug
+    // Cache tous les écrans principaux par défaut
+    configEcran.classList.add('cache');
+    scoreEcran.classList.add('cache');
+    revealEcran.classList.add('cache');
+    podiumEcran.classList.add('cache');
+
+    if (etatPartie === 'lobby') {
+        console.log("Affichage du Lobby"); // Debug
+        configEcran.classList.remove('cache');
+        // Affiche la section joueurs connectés seulement si on est dans une partie
+        if (partieId) {
+             // Cache Créer/Rejoindre si on est déjà dans une partie
+             document.querySelector('.lobby-section:nth-child(1)').classList.add('cache');
+             document.querySelector('.lobby-section:nth-child(2)').classList.add('cache');
+             // Affiche les joueurs et options
+             afficherLobbyJoueurs();
+             lobbyJoueursDiv.classList.remove('cache');
+        } else {
+             // Si pas dans une partie, montre Créer/Rejoindre et cache le reste
+             document.querySelector('.lobby-section:nth-child(1)').classList.remove('cache');
+             document.querySelector('.lobby-section:nth-child(2)').classList.remove('cache');
+             lobbyJoueursDiv.classList.add('cache');
+              // S'assure que les champs/boutons sont réactivés si on a quitté une partie
+             creerPartieBtn.disabled = false;
+             creerPartieBtn.classList.remove('cache');
+             nomCreateurInput.disabled = false;
+             couleurCreateurInput.disabled = false;
+             rejoindrePartieBtn.disabled = false;
+             codePartieAffichage.classList.add('cache');
+             attenteJoueursMsg.classList.add('cache');
+        }
+
+    } else if (etatPartie === 'en_cours') {
+        console.log("Affichage de l'écran Score"); // Debug
+        scoreEcran.classList.remove('cache');
+        // Initialiser ou mettre à jour l'écran de score
+        if (!monGraphique && canvasGraphique) { // Vérifie aussi que le canvas existe
+            genererChampsSaisie();
+             creerGraphique();
+        }
+        mettreAJourScoresAffichage();
+        mettreAJourCompteurs();
+        mettreAJourGraphique();
+    } else if (etatPartie === 'terminee') {
+        console.log("Affichage de l'écran Podium"); // Debug
+         // La logique de fin (calcul rangs, etc.) est maintenant dans terminerPartieLogiqueLocale
+         // Appeler cette logique ici si elle n'a pas déjà été déclenchée par terminerPartieFirebase
+         // (par exemple si un joueur rejoint tardivement une partie terminée)
+         if(classementFinal.length === 0 && joueurs.length > 0) { // Si pas déjà calculé
+             terminerPartieLogiqueLocale(); // Calcule les rangs et lance potentiellement la séquence reveal
+         } else if (!revealEcran.classList.contains('cache')) {
+            // Si la séquence reveal est en cours, ne rien faire ici
+         }
+         else {
+             // Si la séquence est finie ou n'a pas eu lieu, affiche le podium direct
+             podiumEcran.classList.remove('cache');
+             construirePodiumFinal();
+         }
+    }
+}
+
+// Fonction pour afficher le lobby (essentielle !)
+function afficherLobbyJoueurs() {
+     listeJoueursLobbyDiv.innerHTML = ''; // Vide la liste
+
+     joueurs.forEach((joueur) => {
+        const tag = document.createElement('div');
+        tag.className = 'joueur-tag';
+        const swatch = document.createElement('span');
+        swatch.className = 'joueur-couleur-swatch';
+        swatch.style.backgroundColor = joueur.couleur;
+        const nom = document.createElement('span');
+        nom.textContent = joueur.nom + (joueur.id === createurId ? ' (Créateur)' : '');
+        if (joueur.id === joueurId) {
+             nom.textContent += ' (Vous)';
+             nom.style.fontWeight = 'bold';
+        }
+
+        tag.appendChild(swatch);
+        tag.appendChild(nom);
+        listeJoueursLobbyDiv.appendChild(tag);
+    });
+
+    const estCreateur = (joueurId === createurId);
+    optionsCreateurDiv.classList.toggle('cache', !estCreateur);
+    attenteLancementMsg.classList.toggle('cache', estCreateur);
+
+    if (estCreateur) {
+        lancerPartieBtn.disabled = joueurs.length < 2;
+        // Met à jour les options affichées avec les valeurs actuelles de Firebase
+        modeSecretConfig.checked = scoresSecrets;
+        conditionVictoireRadios.forEach(radio => {
+             radio.checked = (lowScoreWins && radio.value === 'low') || (!lowScoreWins && radio.value === 'high');
+        });
+    }
+}
+
+// Fonction pour lancer la partie (inchangée)
+async function lancerPartie() {
+    if (joueurId !== createurId || joueurs.length < 2) return;
+
+    // Récupère les dernières valeurs des options avant de lancer
+    scoresSecrets = modeSecretConfig.checked;
+    lowScoreWins = document.querySelector('input[name="condition-victoire"]:checked').value === 'low';
+
+    try {
+        await db.collection('parties').doc(partieId).update({
+            etatPartie: 'en_cours',
+            scoresSecrets: scoresSecrets, // Sauvegarde l'option
+            lowScoreWins: lowScoreWins,   // Sauvegarde l'option
+            mancheActuelle: 0
+        });
+        // onSnapshot s'occupera du changement d'écran
+    } catch (error) {
+        console.error("Erreur lors du lancement de la partie:", error);
+        alert("Impossible de lancer la partie.");
+    }
+}
+
+// Fonction valider tour (inchangée)
+async function validerTourFirebase() {
+     if (validerTourBouton.disabled) return;
+     let scoresJoueursMisAJour = JSON.parse(JSON.stringify(joueurs)); // Copie profonde
+
+     scoresJoueursMisAJour.forEach((joueur, index) => {
+        const inputElement = document.getElementById(`score-${index}`);
+        if(inputElement) {
+            const points = parseInt(inputElement.value, 10) || 0;
+            // Met à jour la copie
+            joueur.scoreTotal += points;
+            // Assure que scoresTour est un tableau
+            if (!Array.isArray(joueur.scoresTour)) {
+                joueur.scoresTour = [];
+            }
+            joueur.scoresTour.push(points);
+            inputElement.value = 0;
+        }
+     });
+
+     try {
+          await db.collection('parties').doc(partieId).update({
+               joueurs: scoresJoueursMisAJour, // Ecrase avec la copie mise à jour
+               mancheActuelle: firebase.firestore.FieldValue.increment(1)
+          });
+          // La vérification des conditions se fera via onSnapshot quand les données reviennent
+          // verifierConditionsArret(); // On commente pour éviter double appel potentiel
+     } catch (error) {
+          console.error("Erreur lors de la validation du tour:", error);
+          alert("Erreur lors de la sauvegarde des scores.");
+     }
+}
+
+// Fonction terminer partie (inchangée)
+async function terminerPartieFirebase() {
+     if (!partieId) return;
+     try {
+          // Met à jour l'état ET s'assure que scoresSecrets est bien false à la fin
+          await db.collection('parties').doc(partieId).update({
+               etatPartie: 'terminee',
+               scoresSecrets: false // Force la révélation des scores dans la DB
+          });
+          // onSnapshot déclenchera terminerPartieLogiqueLocale via mettreAJourUI
+     } catch (error) {
+          console.error("Erreur lors de la fin de partie:", error);
+          alert("Impossible de terminer la partie correctement.");
+     }
+}
 
 // --- ANCIENNES FONCTIONS ADAPTÉES ---
-// (Fonction calculerRangs - Inchangée)
+
 function calculerRangs(joueursTries) { /* ... (inchangé) ... */ }
-// (Fonction construirePodiumFinal - Inchangée)
 function construirePodiumFinal() { /* ... (inchangé) ... */ }
-// (Fonction majContenuReveal - Inchangée)
 function majContenuReveal(rang, joueur, estExAequoPrecedent) { /* ... (inchangé) ... */ }
-// (Fonction demarrerSequenceReveal - Inchangée)
 async function demarrerSequenceReveal() { /* ... (inchangé) ... */ }
-// (Fonction terminerPartieLogiqueLocale - Renommée/Adaptée, appelée par mettreAJourUI ou terminerPartie)
-// Note: La reconstruction graphique de terminerPartie originale est mieux gérée ici
-function logiqueFinDePartie() {
+
+// Fonction pour la logique locale de fin de partie (calculs, reconstruction graphique si besoin)
+function terminerPartieLogiqueLocale() {
+    console.log("Déclenchement logique fin de partie locale"); // Debug
     sequenceForceStop = false;
-    validerTourBouton.disabled = true; // Désactive les boutons au cas où
+    validerTourBouton.disabled = true;
     arreterMaintenantBouton.disabled = true;
 
     const graphContainer = document.querySelector('.graphique-container');
@@ -274,17 +455,19 @@ function logiqueFinDePartie() {
         graphContainer.classList.remove('cache');
     }
 
-     // --- Calculer le classement final localement ---
     let joueursTries = [...joueurs].sort((a, b) => {
         return lowScoreWins ? a.scoreTotal - b.scoreTotal : b.scoreTotal - a.scoreTotal;
     });
     classementFinal = calculerRangs(joueursTries);
 
-    // --- Gérer le cas secret (reconstruction graphique) ---
-    // Utilise la variable globale 'scoresSecrets' mise à jour par onSnapshot
-    if (scoresSecrets) {
-        // Met à jour l'affichage maintenant que scoresSecrets est (théoriquement) false
-         mettreAJourScoresAffichage(); // Met à jour avec scores révélés et rangs
+    // Vérifie si la partie *était* secrète *avant* la mise à jour de Firebase
+    // On se base sur l'état de la checkbox qui était visible par le créateur
+    const etaitSecret = modeSecretConfig.checked; // Ou une autre variable si besoin
+
+    if (etaitSecret && !scoresSecrets) { // Si elle était secrète et que Firebase l'a révélée
+         console.log("Mode secret détecté, reconstruction graphique..."); // Debug
+        // Met à jour l'affichage maintenant que scoresSecrets est false
+         mettreAJourScoresAffichage();
 
         if (monGraphique) {
             // (Code de reconstruction du graphique - inchangé)
@@ -296,10 +479,12 @@ function logiqueFinDePartie() {
                 joueurs.forEach((joueur, index) => {
                     const scoreDeCeTour = joueur.scoresTour[i] || 0;
                     scoreCumules[index] += scoreDeCeTour;
-                     monGraphique.data.datasets[index].data[i+1] = scoreCumules[index];
+                     if(monGraphique.data.datasets[index]) { // Vérif dataset existe
+                        monGraphique.data.datasets[index].data[i+1] = scoreCumules[index];
+                     }
                 });
             }
-             const maxDataLength = Math.max(...monGraphique.data.datasets.map(d => d.data.length));
+             const maxDataLength = Math.max(0, ...monGraphique.data.datasets.map(d => d.data.length));
              while(monGraphique.data.labels.length < maxDataLength) { monGraphique.data.labels.push(`Manche ${monGraphique.data.labels.length}`); }
             monGraphique.update();
             monGraphique.resize();
@@ -308,46 +493,74 @@ function logiqueFinDePartie() {
         alert("FIN DE PARTIE : Les scores secrets sont révélés !");
         setTimeout(demarrerSequenceReveal, 100);
     } else {
-        mettreAJourScoresAffichage(); // Met à jour avec les rangs
+         console.log("Mode normal ou déjà révélé, lancement séquence reveal..."); // Debug
+        // Met à jour l'affichage avec les rangs (si pas déjà fait)
+        mettreAJourScoresAffichage();
         demarrerSequenceReveal();
     }
 }
 
 
 // --- FONCTIONS GRAPHIQUE ---
-// (Fonction genererCouleurAleatoire - Inchangée)
 function genererCouleurAleatoire() { /* ... (inchangé) ... */ }
-// (Fonction creerGraphique - Inchangée, correction précédente ok)
 function creerGraphique() { /* ... (inchangé) ... */ }
-// (Fonction mettreAJourGraphique - Inchangée, correction précédente ok)
-function mettreAJourGraphique() { /* ... (inchangé) ... */ }
+function mettreAJourGraphique() {
+     // Ne met à jour que si le graphique existe et si la partie est en cours et non secrète
+     if (!monGraphique || scoreEcran.classList.contains('cache') || scoresSecrets) {
+        // console.log("Mise à jour graphique skipée (caché ou secret)"); // Debug
+        return;
+     }
+     // console.log("Mise à jour graphique pour manche", mancheActuelle); // Debug
+
+     const labelManche = 'Manche ' + mancheActuelle;
+     if (!monGraphique.data.labels.includes(labelManche) && mancheActuelle > 0) {
+         monGraphique.data.labels.push(labelManche);
+     }
+
+     joueurs.forEach((joueur, index) => {
+          if(monGraphique.data.datasets[index]) {
+             // Assure que le tableau data a assez d'éléments
+             while(monGraphique.data.datasets[index].data.length <= mancheActuelle) {
+                 monGraphique.data.datasets[index].data.push(null); // Ajoute des null si besoin
+             }
+             monGraphique.data.datasets[index].data[mancheActuelle] = joueur.scoreTotal;
+          }
+     });
+
+     // S'assure qu'il y a assez de labels
+     const maxDataLength = Math.max(0, ...monGraphique.data.datasets.map(d => d.data.length));
+     while(monGraphique.data.labels.length < maxDataLength) {
+        monGraphique.data.labels.push(`Manche ${monGraphique.data.labels.length}`);
+     }
+
+     monGraphique.update();
+}
 
 
 // --- GESTION DES ÉVÉNEMENTS ---
-// Nouveaux événements pour le Lobby
 creerPartieBtn.addEventListener('click', creerPartie);
 rejoindrePartieBtn.addEventListener('click', rejoindrePartie);
 lancerPartieBtn.addEventListener('click', lancerPartie);
 copierCodeBtn.addEventListener('click', () => { /* ... (inchangé) ... */ });
-
-// Événements existants (adaptés)
 validerTourBouton.addEventListener('click', validerTourFirebase);
 arreterMaintenantBouton.addEventListener('click', terminerPartieFirebase);
-
-// (Événements Skip - Inchangés)
 revealEcran.addEventListener('click', (e) => { /* ... (inchangé) ... */ });
 skipAllBtn.addEventListener('click', () => { /* ... (inchangé) ... */ });
-
-// (Gestion des checkboxes de condition - OK mais l'effet sera via Firebase)
 conditionCheckboxes.forEach(checkbox => { /* ... (inchangé) ... */ });
 [scoreLimiteInput, scoreRelatifInput, nbManchesTotalInput, nbManchesRestantesInput].forEach(input => { /* ... (inchangé) ... */ });
 
 
 // --- INITIALISATION ---
+// Assure que seul l'écran de config (lobby initial) est visible
 configEcran.classList.remove('cache');
 scoreEcran.classList.add('cache');
 revealEcran.classList.add('cache');
 podiumEcran.classList.add('cache');
+// Cache la section joueurs/options au début
+lobbyJoueursDiv.classList.add('cache');
+
 
 couleurCreateurInput.value = genererCouleurAleatoire();
 couleurRejoindreInput.value = genererCouleurAleatoire();
+
+console.log("Application initialisée. En attente d'action utilisateur."); // Debug
